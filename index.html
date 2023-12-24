@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeu TP1</title>
+
+    <link rel="stylesheet" href="styles.css">
+ 
+</head>
+<body>
+    <h1>Tombée des étoiles</h1>
+    <canvas width="1000" height="500"> </canvas>
+
+    <script>
+        //Récupérer le canvas
+        let leCanvas = document.querySelector("canvas");
+        let ctx = leCanvas.getContext("2d");
+
+        //Mettre un arriere plan
+        leCanvas.style.backgroundImage = "url('images/menujeu.gif')"
+
+
+        //Variable monstre de type Objet pour déterminer les propriétés du monstre
+        let monstre = {
+            img: new Image(),
+            urlImage: "images/spritesheetMonstre.png",
+            x: 0,
+            y: 0,
+            largeur: 102,
+            hauteur: 75,
+            nbVignettes: 2, //Nombre de vignettes
+            indexVignette: 0, //Index de la première vignette
+            sourceX: 0, //Coordonnée X de la source de chaque vignette
+            vitesseX: 5, //Vitesse du poulet sur l'axe des X
+            vitesseY: 5, //Vitesse du poulet sur l'axe des Y
+        };
+        //Chrager l'image du monstre
+        monstre.img.src = monstre.urlImage;
+
+
+        //Charger la position initiale du monstre
+        monstre.x = 100;
+        monstre.y = leCanvas.height / 2 - monstre.hauteur / 2;
+
+        //Variable étoile de type Objet pour déterminer les propriétés d'une étoile
+        let etoile = {
+            img: new Image(),
+            x: entierHasard(0, leCanvas.width - 83),
+            y: -82,
+            largeur: 83,
+            hauteur: 82,
+            vitesseY: entierHasard(3, 7),
+        };
+
+        //Variable étoile mangée de type Objet pour déterminer ses propriétés 
+        let etoileMangee = {
+            img: new Image(),
+            x: 0,
+            y: 0,
+            largeur: 0,
+            hauteur: 0,
+            vitesseY: 0,
+            collisionProduite: true // Set collisionProduite for the modified object
+        };
+
+        //Variable roche de type Objet pour déterminer les propriétés de la roche
+        let roche = {
+            img: new Image(),
+            urlImage: "images/ast2.png",
+            x: 0,
+            y: 0,
+            largeur: 89,
+            hauteur: 100,
+            vitesseX: 6,
+            vitesseY: 6,
+            collisionProduite: false
+        };
+        roche.img.src = roche.urlImage;
+
+
+        //Variables pour gérer les touches fléchées du clavier
+        let flecheGauche = false;
+        let flecheDroite = false;
+        let flecheHaut = false;
+        let flecheBas = false;
+
+        //Variables pour gérer le score du jeu
+        let compteurScore = 0;
+        //Variables pour savoir si c'est la fin du jeu ou pas
+        let finDuJeu = false;
+
+        //Tableau pour stocker les étoiles
+        let lesEtoiles = [];
+        
+        //Variables pour déclarer le son d'arriere plan
+        let sonArrierePlan = new Audio("images/music.mp3");
+        //Variables pour déclarer le son de collision
+        let sonCollisionRoche = new Audio("images/ding.mp3");
+        //Variables pour déclarer le son de victoire
+        let sonVictoire= new Audio("images/Victoire.mp3");
+        //Variables pour déclarer le son de défaite
+        let sonDéfaite= new Audio("images/Défaite.mp3");
+
+    
+        //Déclarer les addEventListeners
+        leCanvas.addEventListener("click", debuterleJeu, { once: true });
+        window.addEventListener("keydown", presserTouche);
+        window.addEventListener("keyup", relacherTouche);
+        leCanvas.addEventListener('click', recommencerLeJeu);
+       
+
+
+        //Variable déclarer pour l'actualisation du jeu
+        let intervalD;
+        //Gérer l'animation du monstre
+        let intervalImageMonstre = setInterval(gererImageDuMonstre, 1000/3)
+        //On met une étoile à tous les 1/4 secondes
+        let intervalEtoileID = setInterval(mettreUneEtoile, 1000 / 3);
+
+        //Mettre une première roche
+        mettreUneEtoile();
+
+
+        /////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////
+        /*                  FONCTION                       */
+        /////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////
+
+        
+        //Fonction pour débuter le jeu
+        function debuterleJeu (){
+                //Effacer le canvas
+                ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+
+                //Afficher l'arriere plan
+                leCanvas.style.backgroundImage = "url('images/fondJeu.gif')";
+
+                //Actualisation du jeu à une cadence de 60 ipslet 
+                intervalD = setInterval(actualiserLeJeu, 1000 / 60); 
+            }
+       
+  
+        //Fonction pour actualiser du jeu
+        function actualiserLeJeu(){
+            //Effacer le canvas
+             ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+
+            //Jouer le son et le looper
+             sonArrierePlan.play();
+             sonArrierePlan.loop = true;
+            
+            //Appeler la fonction qui gère le monstre
+             deplacerLeMonstre();
+
+            //Appeler la fonction qui gère les étoiles
+             deplacerLesEtoiles();
+
+            //Appeler la fonction qui gère la roche
+             deplacerLaRoche();
+
+            //Appeler la fonction qui gère la collisions avec les étoiles
+             gestionCollisionAvecEtoile();
+
+            
+            //Appeler la fonction qui gère le score
+             afficherLeScore();
+
+            //Appeler la fonction qui gère et analyse la fin du jeu
+             analysefinDuJeu();
+            }
+
+
+
+
+        //fonction pour recommencer le jeu
+        function recommencerLeJeu() {
+            //Si la fin du jeu est vrai
+            //Réinitialiser toutes les variables du jeu à leurs valeurs initiales
+            if (finDuJeu === true) {
+                monstre.x = 100;
+                monstre.y = leCanvas.height / 2 - monstre.hauteur / 2;
+                roche.x = leCanvas.width-roche.largeur
+                roche.y = Math.random()* entierHasard(0,leCanvas.height-roche.hauteur);
+                compteurScore = 0;
+                finDuJeu = false;
+                lesEtoiles = [];
+
+                //Effacer tous les intervalles actifs
+                clearInterval(intervalD);
+                clearInterval(intervalEtoileID);
+                clearInterval(intervalImageMonstre);
+
+                //Rappeller la fonction débuter le jeu pour pouvoir commencer le jeu
+                debuterleJeu();
+
+                //Redémarrer les intervals pour les étoiles tombantes et l'animation du monstre
+                intervalEtoileID = setInterval(mettreUneEtoile, 1000 / 3);
+                intervalImageMonstre = setInterval(gererImageDuMonstre, 1000/3)
+            }
+        }
+
+
+
+        //Function pou déplacer le monstre
+        function deplacerLeMonstre() {
+
+            //Déplacement automatique du monstre
+            monstre.x -= 2
+
+            //Ajuster la vitesse du monstre selon la fleche presser
+            if (flecheDroite) {
+                monstre.x += monstre.vitesseX;
+            }
+            if (flecheGauche) {
+                monstre.x -= monstre.vitesseX;
+            }
+            if (flecheHaut) {
+                monstre.y -= monstre.vitesseY;
+            }
+            if (flecheBas) {
+                monstre.y += monstre.vitesseY;
+            }
+
+            //Gerer les limites du canvas pour pour empêcher le monstre de sortir de la scène
+            //Limite gauche
+            if (monstre.x < 0 - monstre.largeur/2) {
+                monstre.x = 0 - monstre.largeur/2;
+            }
+           
+            //Limite droite
+            let xMax = leCanvas.width - monstre.largeur/2;
+              if (monstre.x > xMax) {
+                monstre.x = xMax;
+            }
+
+            //Limite haut
+            if (monstre.y < 0 - monstre.hauteur/2) {
+                monstre.y = 0 - monstre.hauteur/2;
+            }
+            //Limite bas
+            let yMax = leCanvas.height - monstre.hauteur/2;
+            if (monstre.y > yMax) {
+                monstre.y = yMax;
+            }
+
+            //Dessiner le monstre
+            ctx.drawImage(monstre.img, monstre.sourceX, 0, monstre.largeur, monstre.hauteur
+                            ,monstre.x ,monstre.y ,monstre.largeur ,monstre.hauteur);
+                           
+        }
+
+
+        //Fonction pour gérer la vignette à afficher pour l'animation du monstre
+        function gererImageDuMonstre() {
+            //Définir la coordonnée sourceX de la vignette à afficher
+            monstre.sourceX = monstre.indexVignette*monstre.largeur
+
+            //Incrémenter et gérer l’index de la prochaine vignette à afficher
+            monstre.indexVignette += 1;
+            if(monstre.indexVignette == monstre.nbVignettes){
+                monstre.indexVignette = 0;
+                   
+            }
+        }
+
+
+       
+        //Fonction qui ajoutera une étoile à tous les 1/3 seconde
+        function mettreUneEtoile() {
+            //Objet pour une étoile
+            let etoile = {
+                img: new Image(),
+                x: entierHasard(0, leCanvas.width - 30),
+                y: -30,
+                largeur: 30,
+                hauteur: 30,
+                vitesseY: entierHasard(3, 7),
+                collisionProduite: false
+            };
+            //Charger l'image d'une étoile
+            numEtoile = Math.ceil(Math.random() * 3);
+            etoile.img.src = "images/etoile" + numEtoile + ".png";
+                
+
+            //Mettre cette étoile dans le tableau des étoiles
+            lesEtoiles.push(etoile);
+        }
+
+
+        //Fonction pour déplacer les étoiles
+        function deplacerLesEtoiles() {
+            //Tous les étoiles descendent du ciel!!!
+            //On les retire du tableau losrqu'elle quitte le bas du canvas
+            for (let uneEtoile of lesEtoiles) {
+                //Incrémenter sa vitesse sur l'axe des Y
+                uneEtoile.y += uneEtoile.vitesseY;
+                //Dessiner la roche
+                ctx.drawImage(uneEtoile.img, uneEtoile.x, uneEtoile.y);
+
+                //On retire cette étoile du tableau si elle dépasse les limites du canvas
+                if (uneEtoile.y > leCanvas.height) {
+                    //On identifie l'index de cette roche
+                    let index = lesEtoiles.indexOf(uneEtoile);
+                    //L'enlever du tableau des roches
+                    lesEtoiles.splice(index, 1);
+                }
+                //console.log("Nombre de roches :", lesRoches.length);
+            }
+        }
+
+        //Fonction pour gérer les collisions avec le monstre et les étoiles
+        function gestionCollisionAvecEtoile() {
+        for (let i = 0; i < lesEtoiles.length; i++) {
+        let uneEtoile = lesEtoiles[i];
+        if (detecterCollision(monstre, uneEtoile) && !uneEtoile.collisionProduite) {
+            //Si il y'a une collision avec une etoile2, le score augmente de 15
+            if (uneEtoile.img.src.includes('etoile2')) {
+                compteurScore += 15; 
+            //Si il y'a une collision avec une etoile3, le score descend de 10
+            } else if(uneEtoile.img.src.includes('etoile3')) {
+                compteurScore -= 10
+
+            } else {
+                compteurScore += 5; //Augmenter le score de 5
+            }
+
+            //Marquer que la collision a été produite
+            uneEtoile.collisionProduite = true;
+            console.log('Collision produite!');
+
+            //Supprimer l'objet entré en collision du tableau
+            lesEtoiles.splice(i, 1);
+
+            //Déclarer la version mangée de l'objet qui ce montre avec une collision d'étoile
+            let etoileMangee = {
+                img: new Image(),
+                x: uneEtoile.x,
+                y: uneEtoile.y,
+                largeur: uneEtoile.largeur,
+                hauteur: uneEtoile.hauteur,
+                vitesseY: uneEtoile.vitesseY,
+                collisionProduite: true
+            };
+            //Déclarer la source de l'image
+            etoileMangee.img.src = "images/starabsorb.png";
+
+            //Réinsérer l'objet modifié au même index
+            lesEtoiles.splice(i, 0, etoileMangee);
+        }
+    }
+}
+
+        // Fonction pour déplacer la roche selon les limites du canvas
+        function deplacerLaRoche() {
+            //Si la roche dépasse les limites horizontales du canvas
+            if (roche.x + roche.largeur > leCanvas.width || roche.x < 0) {
+                //Inverser la direction horizontale de déplacement si la roche dépasse les limites
+                roche.vitesseX = -roche.vitesseX;
+            }
+
+            //Sii la roche dépasse les limites verticales du canvas
+            if (roche.y + roche.hauteur > leCanvas.height || roche.y < 0) {
+            // Inverser la direction verticale de déplacement si la roche dépasse les limites
+            roche.vitesseY = -roche.vitesseY;
+            }
+
+        //Mettre à jour les coordonnées de la roche selon sa vitesse horizontale et verticale
+        roche.x += roche.vitesseX;
+        roche.y += roche.vitesseY;
+
+        //Dessiner l'image de la roche
+        ctx.drawImage(roche.img, roche.x, roche.y)
+        }
+
+    
+
+        //Fonction pour analyser la fin du jeu 
+        function analysefinDuJeu(){
+            //S'il y a une collision entre le monstre et la roche, on détecte la fin du jeu et on affiche un message de défaite
+            if (detecterCollision(monstre, roche) && !roche.collisionProduite) {
+                //Effacer le canvas
+                ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+                //Afficher l'arriere plan
+                leCanvas.style.backgroundImage = "url('images/ecranDefaiteRoche.gif')"
+
+                //Activer le son pour une collision
+                sonCollisionRoche.play();
+
+                //Mettre fin au jeu et arrête les intervalles
+                finDuJeu = true
+                roche.collisionProduite = true
+                clearInterval(intervalD);
+                clearInterval(intervalEtoileID);
+                clearInterval(intervalImageMonstre);
+            //S'il le score est de plus de 100, on détecte la fin du jeu et on affiche un message de victoire
+            } else if (compteurScore >= 100) {
+                    //Effacer le canvas
+                    ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+                    //Afficher l'arriere plan
+                    leCanvas.style.backgroundImage = "url('images/ecranVictoire.gif')"
+
+                    
+                    //Activer le son pour une victoire
+                    sonVictoire.play();
+
+                    //Mettre fin au jeu et arrête les intervalles
+                    finDuJeu = true;
+                    clearInterval(intervalD);
+                    clearInterval(intervalEtoileID);
+                    clearInterval(intervalImageMonstre);
+            //S'il le score est moins que 100, on détecte la fin du jeu et on affiche un autre message de défaite
+            } else if (compteurScore <= -100) {
+                    //Effacer le canvas
+                    ctx.clearRect(0, 0, leCanvas.width, leCanvas.height);
+                    //Afficher l'arriere plan
+                    leCanvas.style.backgroundImage = "url('images/ecranDéfaiteParScore.gif')"
+
+                     //Activer le son pour une défaite
+                     sonDéfaite.play();
+
+                    //Mettre fin au jeu et arrête les intervalles
+                    finDuJeu = true;
+                    clearInterval(intervalD);
+                    clearInterval(intervalEtoileID);
+                    clearInterval(intervalImageMonstre);
+            } else {
+                    //Réinitialiser la collision produite par la rocher et le monstre a faux
+                    roche.collisionProduite = false;
+            }
+        }
+
+
+
+        //Fonction pour détecter la collision entre 2 rectangles
+        function detecterCollision(rectangle1, rectangle2) {
+            if (
+                rectangle1.x < rectangle2.x + rectangle2.largeur &&
+                rectangle1.x + rectangle1.largeur > rectangle2.x &&
+                rectangle1.y < rectangle2.y + rectangle2.hauteur &&
+                rectangle1.y + rectangle1.hauteur > rectangle2.y
+            ) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+
+
+             //Fonction pour calculer un nombre entier au hasard entre 2 valeurs
+        function entierHasard(nbMin, nbMax) {
+                let intervalle = nbMax - nbMin;
+                return nbMin + Math.round(Math.random() * intervalle);
+            }
+
+
+
+            //Fonction pour afficher le score
+        function afficherLeScore() {
+                //Style de base du texte
+                ctx.font = "30px 'Trebuchet MS', sans-serif";
+                ctx.fillStyle = "#467DA3";
+                ctx.textBaseline = "top";
+                ctx.textAlign = "left";
+
+                //dessiner le score en en haut et a la gauche
+                ctx.fillText("SCORE: " + compteurScore, 20, 20);
+            }
+
+
+
+            //Fonction pour gérer si une touche fléchée est appuyée
+        function presserTouche(event) {
+            event.preventDefault();
+            //Enregistrer si une touche gauche/droite est pressée
+            if (event.keyCode == 39) {
+                flecheDroite = true;
+            }
+            if (event.keyCode == 37) {
+                flecheGauche = true;
+            }
+            //Enregistrer si une touche haut/bas est pressée
+            if (event.keyCode == 38) {
+                flecheHaut = true;
+            }
+            if (event.keyCode == 40) {
+                flecheBas = true;
+            }
+        }
+
+             //Fonction pour gérer si une touche fléchée est relâchée
+        function relacherTouche(event) {
+            event.preventDefault();
+            //Enregistrer si une touche gauche/droite est relâchée
+            if (event.keyCode == 39) {
+                flecheDroite = false;
+            }
+            if (event.keyCode == 37) {
+                flecheGauche = false;
+            }
+            //Enregistrer si une touche haut/bas est relâchée
+            if (event.keyCode == 38) {
+                flecheHaut = false;
+            }
+            if (event.keyCode == 40) {
+                flecheBas = false;
+            }
+        }
+
+            
+
+    </script>
+</body>
+</html>

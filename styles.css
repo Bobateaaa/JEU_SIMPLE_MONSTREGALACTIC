@@ -1,0 +1,20 @@
+canvas {
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    width: fit-content;
+    margin: 0 auto;
+    border: 3px solid rgb(117, 24, 24);
+}
+
+body {
+    background-color: rgb(10, 8, 10);
+}
+
+h1 {
+    color: rgb(194, 37, 37);
+    width: fit-content;
+    margin: 10px auto;
+}
